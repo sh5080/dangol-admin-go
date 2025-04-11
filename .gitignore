@@ -1,0 +1,36 @@
+# 바이너리/실행 파일
+main
+presigned-url-lambda
+*.exe
+*.out
+
+# 빌드 및 배포 산출물
+.aws-sam/
+packaged.yaml
+samconfig.toml
+
+# 로컬 환경 설정
+env.json
+.env
+.env.*
+
+# 임시 파일
+*.tmp
+*.bak
+*.swp
+
+# IDE/편집기 설정 파일
+.idea/
+.vscode/
+*.sublime-*
+
+# OS 생성 파일
+.DS_Store
+Thumbs.db
+
+# 로그 파일
+*.log
+
+# Go 특화 항목
+/vendor/
+*.test

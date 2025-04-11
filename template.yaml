@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  S3 Presigned URL Generator
+
+# 글로벌 파라미터
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    Description: 배포 환경 (dev, staging, prod)
+  DefaultBucketName:
+    Type: String
+    Description: 기본 S3 버킷 이름 (요청에 버킷이 지정되지 않은 경우 사용)
+    Default: ""
+  DefaultMaxFileSize:
+    Type: String
+    Description: 기본 최대 파일 크기 (바이트 단위)
+    Default: "10485760" # 10MB
+
+# 리소스 정의
+Resources:
+  # Lambda 함수
+  PresignedURLFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: ./
+      Handler: main
+      Runtime: go1.x
+      Architectures:
+        - x86_64
+      MemorySize: 128
+      Timeout: 10
+      Environment:
+        Variables:
+          DEFAULT_BUCKET: !Ref DefaultBucketName
+          ENV: !Ref Environment
+          DEFAULT_MAX_FILE_SIZE: !Ref DefaultMaxFileSize
+      Policies:
+        - S3ReadPolicy:
+            BucketName: "*"
+        - S3WritePolicy:
+            BucketName: "*"
+      Events:
+        APIEvent:
+          Type: Api
+          Properties:
+            Path: /presigned-url
+            Method: post
+        OptionsAPIEvent:
+          Type: Api
+          Properties:
+            Path: /presigned-url
+            Method: options
+
+  # API Gateway
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+
+# 출력 값 정의
+Outputs:
+  PresignedURLFunction:
+    Description: "Presigned URL Lambda 함수 ARN"
+    Value: !GetAtt PresignedURLFunction.Arn
+
+  APIEndpoint:
+    Description: "API Gateway 엔드포인트 URL"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/presigned-url"
