@@ -115,14 +115,4 @@ type User struct {
 	Name  string `json:"name" db:"name"`
 }
 
-// RestaurantRequestsResponse는 매장 생성 요청 목록 응답입니다.
-type RestaurantRequestsResponse struct {
-	Requests []RestaurantRequest `json:"requests"`
-	Total    int                 `json:"total"`
-}
 
-// ProcessRequestPayload는 매장 생성 요청 처리 페이로드입니다.
-type ProcessRequestPayload struct {
-	Status       RequestStatus `json:"status"`
-	RejectReason *string       `json:"rejectReason,omitempty"`
-} 
