@@ -26,7 +26,12 @@ jobs:
         uses: aws-actions/setup-sam@v2
 
       - name: Build
-        run: make build
+        run: |
+          GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o main main.go
+          chmod +x main
+          echo '#!/bin/sh
+          ./main' > bootstrap
+          chmod +x bootstrap
 
       - name: Package
         run: |
