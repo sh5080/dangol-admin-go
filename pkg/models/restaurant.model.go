@@ -8,22 +8,22 @@ import (
 type DayOfWeek string
 
 const (
-	Monday    DayOfWeek = "MON"
-	Tuesday   DayOfWeek = "TUE"
-	Wednesday DayOfWeek = "WED"
-	Thursday  DayOfWeek = "THU"
-	Friday    DayOfWeek = "FRI"
-	Saturday  DayOfWeek = "SAT"
-	Sunday    DayOfWeek = "SUN"
+	MONDAY    DayOfWeek = "MON"
+	TUESDAY   DayOfWeek = "TUE"
+	WEDNESDAY DayOfWeek = "WED"
+	THURSDAY  DayOfWeek = "THU"
+	FRIDAY    DayOfWeek = "FRI"
+	SATURDAY  DayOfWeek = "SAT"
+	SUNDAY    DayOfWeek = "SUN"
 )
 
 // RequestStatus는 요청 상태를 나타내는 열거형입니다.
 type RequestStatus string
 
 const (
-	Pending  RequestStatus = "PENDING"
-	Approved RequestStatus = "APPROVED"
-	Rejected RequestStatus = "REJECTED"
+	PENDING  RequestStatus = "PENDING"
+	APPROVED RequestStatus = "APPROVED"
+	REJECTED RequestStatus = "REJECTED"
 )
 
 // RestaurantStatus는 매장 상태를 나타내는 열거형입니다.
@@ -107,12 +107,4 @@ type RestaurantRequest struct {
 	Status       RequestStatus `json:"status" db:"status"`
 	User         *User         `json:"user,omitempty"`
 }
-
-// User는 사용자 모델입니다.
-type User struct {
-	ID    string `json:"id" db:"id"`
-	Email string `json:"email" db:"email"`
-	Name  string `json:"name" db:"name"`
-}
-
 

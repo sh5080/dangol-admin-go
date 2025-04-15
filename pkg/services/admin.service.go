@@ -43,9 +43,9 @@ func (s *Admin) ProcessRestaurantRequest(ctx context.Context, requestID int, pay
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// 이미 처리된 요청인지 확인
-	if currentStatus != models.Pending {
+	if currentStatus != models.PENDING {
 		return nil, fmt.Errorf("이미 처리된 요청입니다 (현재 상태: %s)", currentStatus)
 	}
 
