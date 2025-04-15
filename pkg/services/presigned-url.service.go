@@ -5,24 +5,24 @@ import (
 	"fmt"
 	"time"
 
-	"presigned-url-lambda/pkg/config"
-	"presigned-url-lambda/pkg/models"
-	"presigned-url-lambda/pkg/utils"
+	config "lambda-go/pkg/configs"
+	"lambda-go/pkg/models"
+	"lambda-go/pkg/utils"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 // PresignedURLService는 Presigned URL 생성과 관련된 서비스를 제공합니다.
-type PresignedURLService struct {
+type PresignedURL struct {
 	config        *config.Config
 	s3Client      *s3.Client
 	presignClient *s3.PresignClient
 }
 
 // NewPresignedURLService는 새 PresignedURLService 인스턴스를 생성합니다.
-func NewPresignedURLService(cfg *config.Config, s3Client *s3.Client, presignClient *s3.PresignClient) *PresignedURLService {
-	return &PresignedURLService{
+func NewPresignedURL(cfg *config.Config, s3Client *s3.Client, presignClient *s3.PresignClient) *PresignedURL {
+	return &PresignedURL{
 		config:        cfg,
 		s3Client:      s3Client,
 		presignClient: presignClient,
@@ -30,7 +30,7 @@ func NewPresignedURLService(cfg *config.Config, s3Client *s3.Client, presignClie
 }
 
 // ValidateAndPreprocessRequest는 요청을 검증하고 기본값을 설정합니다.
-func (s *PresignedURLService) ValidateAndPreprocessRequest(req *models.PresignedURLRequest) error {
+func (s *PresignedURL) ValidateAndPreprocessRequest(req *models.PresignedURLRequest) error {
 	// 버킷 검증
 	if req.Bucket == "" {
 		req.Bucket = s.config.DefaultBucket
@@ -75,7 +75,7 @@ func (s *PresignedURLService) ValidateAndPreprocessRequest(req *models.Presigned
 }
 
 // GeneratePresignedURL은 주어진 요청에 대한 Presigned URL을 생성합니다.
-func (s *PresignedURLService) GeneratePresignedURL(ctx context.Context, req *models.PresignedURLRequest) (*models.PresignedURLResponse, error) {
+func (s *PresignedURL) GeneratePresignedURL(ctx context.Context, req *models.PresignedURLRequest) (*models.PresignedURLResponse, error) {
 	var presignedURL string
 	expiresAt := time.Now().Add(time.Duration(req.Duration) * time.Second).Unix()
 
@@ -88,7 +88,7 @@ func (s *PresignedURLService) GeneratePresignedURL(ctx context.Context, req *mod
 			opts.Expires = time.Duration(req.Duration) * time.Second
 		})
 		if err != nil {
-			return nil, fmt.Errorf("Presigned URL 생성 실패: %w", err)
+			return nil, fmt.Errorf("presigned URL 생성 실패: %w", err)
 		}
 		presignedURL = presignReq.URL
 
@@ -107,7 +107,7 @@ func (s *PresignedURLService) GeneratePresignedURL(ctx context.Context, req *mod
 			opts.Expires = time.Duration(req.Duration) * time.Second
 		})
 		if err != nil {
-			return nil, fmt.Errorf("Presigned URL 생성 실패: %w", err)
+			return nil, fmt.Errorf("presigned URL 생성 실패: %w", err)
 		}
 		presignedURL = presignReq.URL
 	}
@@ -125,4 +125,4 @@ func (s *PresignedURLService) GeneratePresignedURL(ctx context.Context, req *mod
 	}
 
 	return resp, nil
-} 
+}
