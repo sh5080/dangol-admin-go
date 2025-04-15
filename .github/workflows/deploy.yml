@@ -3,6 +3,7 @@ name: Build and Deploy Lambda
 on:
   push:
     branches: [main] # main 브랜치에 푸시될 때 실행
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -25,6 +26,12 @@ jobs:
       - name: Set up SAM CLI
         uses: aws-actions/setup-sam@v2
 
+      - name: Start Deployment Notification
+        run: |
+          curl -X POST -H "Content-type: application/json" \
+          --data "{\"text\":\"🔄 Lambda 배포가 시작되었습니다.\n- 리포지토리: ${{ github.repository }}\n- 브랜치: ${{ github.ref_name }}\n- 커밋: ${{ github.sha }}\"}" \
+          "${{ secrets.SWIT_WEBHOOK_URL }}"
+
       - name: Build
         run: |
           GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o main main.go
@@ -34,6 +41,7 @@ jobs:
           chmod +x bootstrap
 
       - name: Package
+        id: package
         run: |
           sam package \
             --template-file template.yaml \
@@ -41,6 +49,7 @@ jobs:
             --s3-bucket ${{ secrets.S3_BUCKET }}
 
       - name: Deploy
+        id: deploy
         run: |
           sam deploy \
             --template-file packaged.yaml \
@@ -52,3 +61,54 @@ jobs:
               DBPassword=${{ secrets.DB_PASSWORD }} \
               DBName=${{ secrets.DB_NAME }} \
               DBSSLMode=require
+          echo "STACK_ID=$(aws cloudformation describe-stacks --stack-name admin-lambda --query 'Stacks[0].StackId' --output text)" >> $GITHUB_ENV
+
+      - name: Check Stack Status
+        id: check_stack
+        run: |
+          MAX_ATTEMPTS=20
+          ATTEMPT=1
+
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            echo "Checking stack status (attempt $ATTEMPT/$MAX_ATTEMPTS)..."
+            
+            STACK_STATUS=$(aws cloudformation describe-stacks --stack-name admin-lambda --query 'Stacks[0].StackStatus' --output text)
+            
+            if [[ "$STACK_STATUS" == *"COMPLETE"* && "$STACK_STATUS" != *"ROLLBACK"* ]]; then
+              # 배포 성공
+              API_URL=$(aws cloudformation describe-stacks --stack-name admin-lambda --query 'Stacks[0].Outputs[?OutputKey==`PresignedURLEndpoint`].OutputValue' --output text)
+              
+              curl -X POST -H "Content-type: application/json" \
+              --data "{\"text\":\"✅ Lambda 배포가 성공적으로 완료되었습니다.\n- 스택 ID: ${{ env.STACK_ID }}\n- API 엔드포인트: ${API_URL}\"}" \
+              "${{ secrets.SWIT_WEBHOOK_URL }}"
+              exit 0
+              
+            elif [[ "$STACK_STATUS" == *"FAILED"* || "$STACK_STATUS" == *"ROLLBACK"* ]]; then
+              # 배포 실패
+              ERROR=$(aws cloudformation describe-stack-events --stack-name admin-lambda --query 'StackEvents[?ResourceStatus==`CREATE_FAILED` || ResourceStatus==`UPDATE_FAILED`].ResourceStatusReason' --output text | head -n 1)
+              
+              curl -X POST -H "Content-type: application/json" \
+              --data "{\"text\":\"❌ Lambda 배포가 실패했습니다.\n- 상태: ${STACK_STATUS}\n- 오류: ${ERROR}\n- 스택 ID: ${{ env.STACK_ID }}\"}" \
+              "${{ secrets.SWIT_WEBHOOK_URL }}"
+              exit 1
+              
+            else
+              # 아직 진행 중인 상태
+              echo "Deployment still in progress. Status: ${STACK_STATUS}"
+              sleep 15
+              ATTEMPT=$((ATTEMPT + 1))
+            fi
+          done
+
+          # 시간 초과
+          curl -X POST -H "Content-type: application/json" \
+          --data "{\"text\":\"⚠️ Lambda 배포 상태 확인 시간이 초과되었습니다. AWS 콘솔에서 확인하세요.\n- 스택 ID: ${{ env.STACK_ID }}\"}" \
+          "${{ secrets.SWIT_WEBHOOK_URL }}"
+          exit 1
+
+      - name: Notify Failure
+        if: failure()
+        run: |
+          curl -X POST -H "Content-type: application/json" \
+          --data "{\"text\":\"❌ Lambda 배포 워크플로우가 실패했습니다.\n- 리포지토리: ${{ github.repository }}\n- 브랜치: ${{ github.ref_name }}\n- 커밋: ${{ github.sha }}\"}" \
+          "${{ secrets.SWIT_WEBHOOK_URL }}"
