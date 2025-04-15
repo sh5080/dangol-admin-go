@@ -60,5 +60,5 @@ func Validate(data interface{}) error {
 		}
 	}
 
-	return fmt.Errorf(strings.Join(errorMessages, ", "))
+	return fmt.Errorf("%s", strings.Join(errorMessages, ", "))
 }
