@@ -1,14 +1,14 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  S3 Presigned URL Generator
+  Multi-purpose Lambda API (S3 Presigned URL, Admin API)
 
 # 글로벌 파라미터
 Parameters:
   Environment:
     Type: String
     Default: dev
-    Description: 배포 환경 (dev, staging, prod)
+    Description: 배포 환경 (dev, stage, prod)
   DefaultBucketName:
     Type: String
     Description: 기본 S3 버킷 이름 (요청에 버킷이 지정되지 않은 경우 사용)
@@ -17,47 +17,109 @@ Parameters:
     Type: String
     Description: 기본 최대 파일 크기 (바이트 단위)
     Default: "10485760" # 10MB
+  DBHost:
+    Type: String
+    Description: 데이터베이스 호스트
+    Default: ""
+  DBPort:
+    Type: String
+    Description: 데이터베이스 포트
+    Default: "5432"
+  DBUser:
+    Type: String
+    Description: 데이터베이스 사용자
+    Default: ""
+  DBPassword:
+    Type: String
+    Description: 데이터베이스 비밀번호
+    Default: ""
+    NoEcho: true
+  DBName:
+    Type: String
+    Description: 데이터베이스 이름
+    Default: ""
+  DBSSLMode:
+    Type: String
+    Description: 데이터베이스 SSL 모드
+    Default: "disable"
 
 # 리소스 정의
 Resources:
   # Lambda 함수
-  PresignedURLFunction:
+  MultiPurposeFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: ./
       Handler: main
-      Runtime: go1.x
+      Runtime: provided.al2
       Architectures:
         - x86_64
-      MemorySize: 128
-      Timeout: 10
+      MemorySize: 256
+      Timeout: 30
       Environment:
         Variables:
           DEFAULT_BUCKET: !Ref DefaultBucketName
           ENV: !Ref Environment
           DEFAULT_MAX_FILE_SIZE: !Ref DefaultMaxFileSize
+          DB_HOST: !Ref DBHost
+          DB_PORT: !Ref DBPort
+          DB_USER: !Ref DBUser
+          DB_PASSWORD: !Ref DBPassword
+          DB_NAME: !Ref DBName
+          DB_SSL_MODE: !Ref DBSSLMode
       Policies:
         - S3ReadPolicy:
             BucketName: "*"
         - S3WritePolicy:
             BucketName: "*"
+        - VPCAccessPolicy: {}
       Events:
-        APIEvent:
+        # S3 Presigned URL API
+        PresignedURLEvent:
           Type: Api
           Properties:
+            RestApiId: !Ref ApiGateway
             Path: /presigned-url
             Method: post
-        OptionsAPIEvent:
+        PresignedURLOptionsEvent:
           Type: Api
           Properties:
             Path: /presigned-url
+            Method: options
+
+        # 어드민 API - 매장 생성 요청 목록 조회
+        AdminListRestaurantRequestsEvent:
+          Type: Api
+          Properties:
+            Path: /admin/restaurant/request
+            Method: get
+        AdminListRestaurantRequestsOptionsEvent:
+          Type: Api
+          Properties:
+            Path: /admin/restaurant/request
+            Method: options
+
+        # 어드민 API - 매장 생성 요청 처리
+        AdminProcessRestaurantRequestEvent:
+          Type: Api
+          Properties:
+            Path: /admin/restaurant/request/{id}/process
+            Method: post
+        AdminProcessRestaurantRequestOptionsEvent:
+          Type: Api
+          Properties:
+            Path: /admin/restaurant/request/{id}/process
             Method: options
 
   # API Gateway
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
-      StageName: !Ref Environment
+      # 환경 변수와 현재 시간을 이용한 고유 스테이지 이름
+      StageName: !Sub "${Environment}-${AWS::StackName}"
+      Auth:
+        DefaultAuthorizer: NONE
+        ApiKeyRequired: false
       Cors:
         AllowMethods: "'GET,POST,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
@@ -65,10 +127,18 @@ Resources:
 
 # 출력 값 정의
 Outputs:
-  PresignedURLFunction:
-    Description: "Presigned URL Lambda 함수 ARN"
-    Value: !GetAtt PresignedURLFunction.Arn
+  MultiPurposeFunction:
+    Description: "Multi-purpose Lambda function ARN"
+    Value: !GetAtt MultiPurposeFunction.Arn
 
-  APIEndpoint:
-    Description: "API Gateway 엔드포인트 URL"
+  PresignedURLEndpoint:
+    Description: "[POST] presigned URL API endpoint URL"
     Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/presigned-url"
+
+  AdminRestaurantRequestsEndpoint:
+    Description: "[GET] admin restaurant requests API endpoint URL"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/admin/restaurant/request"
+
+  AdminRestaurantRequestProcessEndpoint:
+    Description: "[POST] admin restaurant request process API endpoint URL"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/${Environment}/admin/restaurant/request/{id}/process"

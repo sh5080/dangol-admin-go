@@ -2,9 +2,10 @@
 
 # 변수 정의
 BINARY_NAME=main
-STACK_NAME=presigned-url-generator
-S3_BUCKET=
+STACK_NAME=admin-lambda
+S3_BUCKET=jdg-admin-lambda
 PARAMETER_OVERRIDES=
+AWS_PROFILE?=sh5080
 
 # 기본 타겟
 all: clean build
@@ -14,6 +15,8 @@ build:
 	@echo "Building Go Lambda function..."
 	GOOS=linux GOARCH=amd64 go build -o $(BINARY_NAME) main.go
 	chmod +x $(BINARY_NAME)
+	echo '#!/bin/sh\n./$(BINARY_NAME)' > bootstrap
+	chmod +x bootstrap
 	@echo "Build completed"
 
 # Go 모듈 초기화 및 의존성 다운로드
@@ -31,7 +34,7 @@ clean:
 # 패키지: SAM 패키지 생성
 package:
 	@echo "Packaging SAM application..."
-	sam package \
+	AWS_PROFILE=$(AWS_PROFILE) sam package \
 		--template-file template.yaml \
 		--output-template-file packaged.yaml \
 		--s3-bucket $(S3_BUCKET)
@@ -40,11 +43,11 @@ package:
 # 배포: SAM 배포
 deploy:
 	@echo "Deploying SAM application..."
-	sam deploy \
+	AWS_PROFILE=$(AWS_PROFILE) sam deploy \
 		--template-file packaged.yaml \
 		--stack-name $(STACK_NAME) \
 		--capabilities CAPABILITY_IAM \
-		--parameter-overrides $(PARAMETER_OVERRIDES)
+		$(if $(PARAMETER_OVERRIDES),--parameter-overrides $(PARAMETER_OVERRIDES),)
 	@echo "Deployment completed"
 
 # 로컬 테스트: SAM 로컬로 API 실행
