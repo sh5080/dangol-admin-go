@@ -10,12 +10,9 @@ type PresignedURLRequest struct {
 	MaxFileSize int64  `json:"maxFileSize"` // 최대 파일 크기 (바이트 단위, PUT 요청시 유효)
 }
 
-// PresignedURLResponse는 생성된 presigned URL을 포함한 응답 구조체입니다.
-type PresignedURLResponse struct {
-	URL          string `json:"url"`          // 생성된 presigned URL
-	ContentType  string `json:"contentType"`  // 콘텐츠 타입 (PUT 요청시만 반환)
-	MaxFileSize  int64  `json:"maxFileSize"`  // 최대 파일 크기 (PUT 요청시만 반환)
-	ExpiresAt    int64  `json:"expiresAt"`    // URL 만료 시간 (Unix 타임스탬프)
-}
-
+// ProcessRestaurantRequest는 매장 생성 요청 처리 페이로드입니다.
+type ProcessRestaurantRequest struct {
+	Status       RequestStatus `json:"status" validate:"required,oneof=APPROVED REJECTED"`
+	RejectReason *string       `json:"rejectReason,omitempty" validate:"required_if=Status REJECTED,omitempty"`
+} 
  
