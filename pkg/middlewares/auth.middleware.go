@@ -73,7 +73,7 @@ func SessionAuth(db *sql.DB, next func(context.Context, events.APIGatewayProxyRe
 		// 다음 핸들러 호출
 		response, err := next(ctx, request)
 		if err != nil {
-			return events.APIGatewayProxyResponse{}, utils.InternalServerError("처리 중 오류가 발생했습니다", err)
+			return events.APIGatewayProxyResponse{}, utils.InternalServerError("처리 중 오류가 발생했습니다: " + err.Error())
 		}
 		return response, nil
 	}
@@ -83,11 +83,10 @@ func SessionAuth(db *sql.DB, next func(context.Context, events.APIGatewayProxyRe
 func validateAdminSession(ctx context.Context, db *sql.DB, userID string, token string, clientIP string) (bool, error) {
 	var session AdminSession
 
-	// 세션 쿼리 - JOIN을 사용하여 사용자 정보도 함께 가져옴
 	query := `
-		SELECT s.userId, s.token, s.ip
-		FROM AdminSession s
-		WHERE s.userId = ?
+    SELECT "userId", "token", "ip"
+    FROM "AdminSession"
+    WHERE "userId" = $1
 	`
 	err := db.QueryRowContext(ctx, query, userID).Scan(&session.UserID, &session.Token, &session.IP)
 	
@@ -95,14 +94,14 @@ func validateAdminSession(ctx context.Context, db *sql.DB, userID string, token 
 		if err == sql.ErrNoRows {
 			return false, errors.New("세션을 찾을 수 없습니다")
 		}
-		return false, fmt.Errorf("데이터베이스 오류: %s", err.Error())
+		return false, fmt.Errorf("userID: %s, %s", userID, err.Error())
 	}
 	if session.Token != token {
 		return false, errors.New("세션 토큰 불일치")
 	}
 
-	if session.IP != clientIP {	    
-	    return false, errors.New("세션 IP 불일치")
+	if session.IP != clientIP {    
+	    return false, fmt.Errorf("clientIP: %s 세션 IP 불일치", clientIP)
 	}
 	return true, nil
 }
@@ -151,6 +150,52 @@ func getClientIP(request events.APIGatewayProxyRequest) (string, error) {
 	}
 	
 	return "", errors.New("클라이언트 IP 추출 실패")
+}
+
+// DefaultAuth는 기본 JWT 토큰 검증만 수행하는 미들웨어입니다
+func DefaultAuth(next func(context.Context, events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error)) func(context.Context, events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, *utils.AppError) {
+	return func(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, *utils.AppError) {
+		// OPTIONS 요청은 검증 없이 통과
+		if request.HTTPMethod == "OPTIONS" {
+			response, err := next(ctx, request)
+			if err != nil {
+				return events.APIGatewayProxyResponse{}, utils.InternalServerError("처리 중 오류가 발생했습니다", err)
+			}
+			return response, nil
+		}
+
+		// Authorization 헤더 확인
+		authHeader, ok := request.Headers["Authorization"]
+		if !ok || authHeader == "" {
+			return events.APIGatewayProxyResponse{}, utils.Unauthorized("인증 정보가 필요합니다")
+		}
+		
+		// Bearer 토큰 추출
+		accessToken := strings.TrimPrefix(authHeader, "Bearer ")
+		
+		// JWT 토큰 검증
+		claims, err := utils.VerifyToken(accessToken, config.NewConfig())
+		if err != nil {
+			return events.APIGatewayProxyResponse{}, utils.Unauthorized(fmt.Sprintf("토큰 검증 실패: %v", err))
+		}
+		
+		// 토큰의 클레임 정보를 컨텍스트에 추가
+		ctx = context.WithValue(ctx, ClaimsKey, claims)
+		
+		// 다음 핸들러 호출
+		response, err := next(ctx, request)
+		if err != nil {
+			return events.APIGatewayProxyResponse{}, utils.InternalServerError("처리 중 오류가 발생했습니다", err)
+		}
+		
+		return response, nil
+	}
+}
+
+// 컨텍스트에서 Claims 정보 가져오기
+func GetClaimsFromContext(ctx context.Context) (*utils.Claims, bool) {
+	claims, ok := ctx.Value(ClaimsKey).(*utils.Claims)
+	return claims, ok
 }
 
 
