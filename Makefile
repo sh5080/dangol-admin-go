@@ -52,10 +52,10 @@ deploy:
 
 # 로컬 테스트: SAM 로컬로 API 실행
 local-api:
-	@echo "Starting local API Gateway..."
-	sam local start-api
+	@echo "Starting local API Gateway with pre-built image..."
+	sam local start-api --skip-pull-image $(if $(PARAMETER_OVERRIDES),--parameter-overrides $(PARAMETER_OVERRIDES),)
 	@echo "Local API stopped"
-
+	
 # 로컬 호출: Lambda 함수 로컬 호출
 local-invoke: build
 	@echo "Invoking Lambda function locally..."
