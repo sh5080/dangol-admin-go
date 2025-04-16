@@ -45,7 +45,7 @@ func VerifyToken(tokenString string, cfg *config.Config) (*Claims, error) {
 				}
 			}
 		}
-		return nil, Unauthorized(fmt.Sprintf("토큰 검증 실패: %s", err.Error()))
+		return nil, Unauthorized(err.Error())
 	}
 	
 	// 토큰이 유효한 경우
