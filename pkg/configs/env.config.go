@@ -13,9 +13,8 @@ type Config struct {
 	DefaultBucket      string
 	DefaultMaxFileSize int64
 	Environment        string
+	JWTSecret          string
 }
-
-
 
 // 환경 변수로부터 기본값을 가져오는 함수
 func GetEnvOrDefault(key, defaultValue string) string {
@@ -41,6 +40,7 @@ func NewConfig() *Config {
 		DefaultBucket:      GetEnvOrDefault("DEFAULT_BUCKET", ""),
 		DefaultMaxFileSize: defaultMaxFileSize,
 		Environment:        GetEnvOrDefault("ENV", "dev"),
+		JWTSecret:          GetEnvOrDefault("JWT_SECRET", "dev-secret-for-testing-only"),
 	}
 }
 
