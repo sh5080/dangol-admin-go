@@ -100,7 +100,7 @@ func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context) ([]mod
 // GetRestaurantRequestByID는 ID로 매장 생성 요청을 조회합니다.
 func (r *RestaurantRepository) GetRestaurantRequestByID(ctx context.Context, requestID string) (models.RequestStatus, error) {
 	var status string
-	query := `SELECT "status" FROM "RestaurantRequest" WHERE "id" = $1 AND "deletedAt" IS NULL`
+	query := `SELECT "status" FROM "RestaurantRequest" WHERE "restaurantId" = $1 AND "deletedAt" IS NULL`
 	
 	err := r.dbPool.QueryRow(ctx, query, requestID).Scan(&status)
 	if err != nil {
@@ -126,10 +126,10 @@ func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, req
 	now := time.Now()
 	
 	// 요청 상태 업데이트
-	updateQuery := `
+	updateRequestQuery := `
 		UPDATE "RestaurantRequest"
 		SET "status" = $1, "updatedAt" = $2, "rejectReason" = $3
-		WHERE "id" = $4 AND "deletedAt" IS NULL
+		WHERE "restaurantId" = $4 AND "deletedAt" IS NULL
 		RETURNING "id", "restaurantId", "userId", "rejectReason", "createdAt", "updatedAt", "deletedAt", "status"
 	`
 	
@@ -148,7 +148,7 @@ func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, req
 	}
 	
 	// 업데이트 실행 및 결과 스캔
-	err = tx.QueryRow(ctx, updateQuery, 
+	err = tx.QueryRow(ctx, updateRequestQuery, 
 		payload.Status, now, rejectReasonVal, requestID,
 	).Scan(
 		&request.ID, &request.RestaurantID, &request.UserID, &rejectReasonSQL,
@@ -170,26 +170,24 @@ func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, req
 		request.DeletedAt = &deleteTime
 	}
 	
-	// 사용자 정보 조회
-	userQuery := `
-		SELECT "id", "email", "name"
-		FROM "user"
-		WHERE "id" = $1
-	`
-	
-	var user models.User
-	err = tx.QueryRow(ctx, userQuery, request.UserID).Scan(
-		&user.ID, &user.Email, &user.Name,
-	)
-	
-	if err != nil {
-		if !errors.Is(err, pgx.ErrNoRows) {
-			return nil, fmt.Errorf("사용자 조회 오류: %w", err)
+	// 승인된 경우에만 Restaurant 상태 업데이트
+	if payload.Status == models.APPROVED {
+		// Restaurant 상태를 HIDDEN으로 업데이트
+		updateRestaurantQuery := `
+			UPDATE "Restaurant"
+			SET "status" = $1, "updatedAt" = $2
+			WHERE "id" = $3
+		`
+		
+		_, err = tx.Exec(ctx, updateRestaurantQuery, 
+			models.Hidden, // HIDDEN 상태로 설정
+			now,
+			request.RestaurantID,
+		)
+		
+		if err != nil {
+			return nil, fmt.Errorf("매장 상태 업데이트 오류: %w", err)
 		}
-		// 사용자가 없는 경우에는 계속 진행
-	} else {
-		// 사용자 정보 설정
-		request.User = &user
 	}
 	
 	// 트랜잭션 커밋
@@ -199,4 +197,4 @@ func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, req
 	}
 	
 	return &request, nil
-} 
+}
