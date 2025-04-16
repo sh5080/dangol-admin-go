@@ -98,14 +98,14 @@ func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context) ([]mod
 }
 
 // GetRestaurantRequestByID는 ID로 매장 생성 요청을 조회합니다.
-func (r *RestaurantRepository) GetRestaurantRequestByID(ctx context.Context, requestID int) (models.RequestStatus, error) {
+func (r *RestaurantRepository) GetRestaurantRequestByID(ctx context.Context, requestID string) (models.RequestStatus, error) {
 	var status string
 	query := `SELECT "status" FROM "RestaurantRequest" WHERE "id" = $1 AND "deletedAt" IS NULL`
 	
 	err := r.dbPool.QueryRow(ctx, query, requestID).Scan(&status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return "", fmt.Errorf("요청 ID %d를 찾을 수 없습니다", requestID)
+			return "", fmt.Errorf("요청 ID %s를 찾을 수 없습니다", requestID)
 		}
 		return "", fmt.Errorf("요청 조회 오류: %w", err)
 	}
@@ -114,7 +114,7 @@ func (r *RestaurantRepository) GetRestaurantRequestByID(ctx context.Context, req
 }
 
 // ProcessRestaurantRequest는 매장 생성 요청을 처리합니다.
-func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, requestID int, payload *models.ProcessRestaurantRequest) (*models.RestaurantRequest, error) {
+func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, requestID string, payload *models.ProcessRestaurantRequest) (*models.RestaurantRequest, error) {
 	// 트랜잭션 시작
 	tx, err := r.dbPool.Begin(ctx)
 	if err != nil {

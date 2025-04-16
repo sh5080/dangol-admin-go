@@ -38,7 +38,7 @@ func (s *Admin) GetRestaurantRequests(ctx context.Context) (*models.RestaurantRe
 }
 
 // ProcessRestaurantRequest는 매장 생성 요청을 승인하거나 거절합니다.
-func (s *Admin) ProcessRestaurantRequest(ctx context.Context, requestID int, payload *models.ProcessRestaurantRequest) (*models.RestaurantRequest, error) {
+func (s *Admin) ProcessRestaurantRequest(ctx context.Context, requestID string, payload *models.ProcessRestaurantRequest) (*models.RestaurantRequest, error) {
 	// 현재 상태 조회
 	currentStatus, err := s.restaurantRepo.GetRestaurantRequestByID(ctx, requestID)
 	if err != nil {
