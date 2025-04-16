@@ -1,11 +1,9 @@
 package handler
 
 import (
-	"encoding/json"
-
 	config "lambda-go/pkg/configs"
-	"lambda-go/pkg/models"
 	service "lambda-go/pkg/services"
+	"lambda-go/pkg/utils"
 
 	"github.com/aws/aws-lambda-go/events"
 )
@@ -27,46 +25,46 @@ func NewHandler(cfg *config.Config, s3Svc *service.PresignedURL, adminSvc *servi
 }
 
 // corsResponse는 CORS 헤더가 포함된 응답을 생성합니다.
-func (h *Handler) corsResponse(statusCode int, body string) events.APIGatewayProxyResponse {
-	return events.APIGatewayProxyResponse{
-		StatusCode: statusCode,
-		Headers: map[string]string{
-			"Content-Type":                 "application/json",
-			"Access-Control-Allow-Origin":  "*",
-			"Access-Control-Allow-Headers": "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token",
-			"Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-		},
-		Body: body,
+func (h *Handler) corsResponse(response events.APIGatewayProxyResponse) events.APIGatewayProxyResponse {
+	// 기존 헤더 유지하면서 CORS 헤더 추가
+	if response.Headers == nil {
+		response.Headers = make(map[string]string)
 	}
+	
+	response.Headers["Access-Control-Allow-Origin"] = "*"
+	response.Headers["Access-Control-Allow-Headers"] = "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
+	response.Headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+	
+	return response
 }
 
 // successResponse는 성공 응답을 생성합니다.
 func (h *Handler) successResponse(statusCode int, data interface{}) events.APIGatewayProxyResponse {
-	response := models.APIResponse{
-		Status: "success",
-		Data:   data,
-	}
-	
-	body, err := json.Marshal(response)
+	response, err := utils.Success(statusCode, data)
 	if err != nil {
 		return h.errorResponse(500, "응답 생성 중 오류가 발생했습니다")
 	}
 	
-	return h.corsResponse(statusCode, string(body))
+	return h.corsResponse(response)
 }
 
-// 에러 응답 생성 함수
+// errorResponse는 에러 응답을 생성합니다.
 func (h *Handler) errorResponse(statusCode int, message string) events.APIGatewayProxyResponse {
-	response := models.APIErrorResponse{
-		Status:  "error",
-		Message: message,
-	}
-	
-	body, err := json.Marshal(response)
+	response, err := utils.Error(statusCode, message)
 	if err != nil {
-		// JSON 마샬링 실패 시 단순 오류 메시지 반환
-		return h.corsResponse(500, `{"status":"error","message":"응답 생성 중 오류가 발생했습니다"}`)
+		// JSON 마샬링에 실패한 경우에 대한 기본 응답
+		defaultResponse := events.APIGatewayProxyResponse{
+			StatusCode: 500,
+			Body:       `{"status":"error","message":"응답 생성 중 오류가 발생했습니다"}`,
+		}
+		return h.corsResponse(defaultResponse)
 	}
 	
-	return h.corsResponse(statusCode, string(body))
+	return h.corsResponse(response)
 }
+
+// handleAppError는 AppError를 적절한 API 응답으로 변환합니다.
+func (h *Handler) handleAppError(appErr *utils.AppError) events.APIGatewayProxyResponse {
+	return h.errorResponse(appErr.StatusCode, appErr.Message)
+}
+
