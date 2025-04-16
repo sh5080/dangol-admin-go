@@ -3,14 +3,12 @@ package main
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
-	"strings"
 
 	config "lambda-go/pkg/configs"
 	handler "lambda-go/pkg/handlers"
-	middleware "lambda-go/pkg/middlewares"
 	repository "lambda-go/pkg/repositories"
+	"lambda-go/pkg/routes"
 	service "lambda-go/pkg/services"
 	"lambda-go/pkg/utils"
 
@@ -50,8 +48,7 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	
 	// 데이터베이스 초기화 (pgxpool 사용)
 	dbCfg := cfg.NewDBConfig()
-	connStr := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		dbCfg.Host, dbCfg.Port, dbCfg.User, dbCfg.Password, dbCfg.Database, dbCfg.SSLMode)
+	connStr := dbCfg.DatabaseURL
 	
 	dbPool, err := pgxpool.Connect(ctx, connStr)
 	if err != nil {
@@ -70,33 +67,24 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	}
 	defer sqlDB.Close()
 	
-	// 리포지토리 생성
 	restaurantRepo := repository.NewRestaurantRepository(dbPool)
-	
-	// 서비스 생성
+
 	s3Svc := service.NewPresignedURL(cfg, s3Client, presignClient)
 	adminSvc := service.NewAdmin(cfg, restaurantRepo)
 	
-	// 핸들러 생성
 	h := handler.NewHandler(cfg, s3Svc, adminSvc)
 	
-	// 어드민 경로일 경우 인증 미들웨어 적용
-	if strings.HasPrefix(request.Path, "/admin/") {
-		// 인증 미들웨어 적용
-		response, appErr := middleware.SessionAuth(sqlDB, h.HandleRequest)(ctx, request)
-		if appErr != nil {
-			return appErrorToResponse(appErr), nil
-		}
-		return response, nil
-	}
+	router := routes.NewRouter()
 	
-	// 일반 경로는 직접 처리
-	response, err := h.HandleRequest(ctx, request)
-	if err != nil {
-		// 일반 에러는 내부 서버 오류로 처리
-		appErr := utils.InternalServerError("처리 중 오류가 발생했습니다", err)
+	routes.RegisterAdminRoutes(router, h)
+	routes.RegisterPublicRoutes(router, h)
+	
+	// 라우터를 통한 요청 처리
+	response, appErr := router.Handle(ctx, request, sqlDB)
+	if appErr != nil {
 		return appErrorToResponse(appErr), nil
 	}
+	
 	return response, nil
 }
 
