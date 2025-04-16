@@ -40,7 +40,7 @@ func NewConfig() *Config {
 		DefaultBucket:      GetEnvOrDefault("DEFAULT_BUCKET", ""),
 		DefaultMaxFileSize: defaultMaxFileSize,
 		Environment:        GetEnvOrDefault("ENV", "dev"),
-		JWTSecret:          GetEnvOrDefault("JWT_SECRET", "dev-secret-for-testing-only"),
+		JWTSecret:          GetEnvOrDefault("JWT_SECRET", "1234567890abcdef"),
 	}
 }
 
