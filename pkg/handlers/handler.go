@@ -11,21 +11,21 @@ import (
 // Handler는 Lambda 핸들러 구조체입니다.
 type Handler struct {
 	config       *config.Config
-	s3Service    *service.PresignedURL
-	adminService *service.Admin
+	S3Service    *service.PresignedURL
+	AdminService *service.Admin
 }
 
 // NewHandler는 새 Handler 인스턴스를 생성합니다.
 func NewHandler(cfg *config.Config, s3Svc *service.PresignedURL, adminSvc *service.Admin) *Handler {
 	return &Handler{
 		config:       cfg,
-		s3Service:    s3Svc,
-		adminService: adminSvc,
+		S3Service:    s3Svc,
+		AdminService: adminSvc,
 	}
 }
 
 // corsResponse는 CORS 헤더가 포함된 응답을 생성합니다.
-func (h *Handler) corsResponse(response events.APIGatewayProxyResponse) events.APIGatewayProxyResponse {
+func (h *Handler) CorsResponse(response events.APIGatewayProxyResponse) events.APIGatewayProxyResponse {
 	// 기존 헤더 유지하면서 CORS 헤더 추가
 	if response.Headers == nil {
 		response.Headers = make(map[string]string)
@@ -39,13 +39,13 @@ func (h *Handler) corsResponse(response events.APIGatewayProxyResponse) events.A
 }
 
 // successResponse는 성공 응답을 생성합니다.
-func (h *Handler) successResponse(statusCode int, data interface{}) events.APIGatewayProxyResponse {
+func (h *Handler) SuccessResponse(statusCode int, data interface{}) events.APIGatewayProxyResponse {
 	response, err := utils.Success(statusCode, data)
 	if err != nil {
 		return h.errorResponse(500, "응답 생성 중 오류가 발생했습니다")
 	}
 	
-	return h.corsResponse(response)
+	return h.CorsResponse(response)
 }
 
 // errorResponse는 에러 응답을 생성합니다.
@@ -57,14 +57,14 @@ func (h *Handler) errorResponse(statusCode int, message string) events.APIGatewa
 			StatusCode: 500,
 			Body:       `{"status":"error","message":"응답 생성 중 오류가 발생했습니다"}`,
 		}
-		return h.corsResponse(defaultResponse)
+		return h.CorsResponse(defaultResponse)
 	}
 	
-	return h.corsResponse(response)
+	return h.CorsResponse(response)
 }
 
-// handleAppError는 AppError를 적절한 API 응답으로 변환합니다.
-func (h *Handler) handleAppError(appErr *utils.AppError) events.APIGatewayProxyResponse {
+// HandleAppError는 AppError를 적절한 API 응답으로 변환합니다.
+func (h *Handler) HandleAppError(appErr *utils.AppError) events.APIGatewayProxyResponse {
 	return h.errorResponse(appErr.StatusCode, appErr.Message)
 }
 
