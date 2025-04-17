@@ -8,6 +8,12 @@ import (
 	"lambda-go/pkg/utils"
 	"strings"
 
+	config "lambda-go/pkg/configs"
+	handler "lambda-go/pkg/handlers"
+	admin "lambda-go/pkg/handlers/admin"
+	public "lambda-go/pkg/handlers/public"
+	service "lambda-go/pkg/services"
+
 	"github.com/aws/aws-lambda-go/events"
 )
 
@@ -117,5 +123,35 @@ func (r *router) Handle(ctx context.Context, request events.APIGatewayProxyReque
 	
 	// 일치하는 라우트가 없는 경우
 	return events.APIGatewayProxyResponse{}, utils.NotFound("요청한 API를 찾을 수 없습니다")
+}
+
+// SetupRouter는 핸들러를 생성하고 라우트를 등록합니다.
+func SetupRouter(
+	ctx context.Context, 
+	cfg *config.Config, 
+	s3Svc *service.PresignedURL, 
+	adminSvc *service.Admin,
+	db *sql.DB,
+) (Router, func(context.Context, events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, *utils.AppError)) {
+	// 기본 핸들러 생성
+	h := handler.NewHandler(cfg, s3Svc, adminSvc)
+	
+	// 도메인별 핸들러 생성
+	adminHandler := &admin.AdminHandler{Handler: h}
+	s3Handler := &public.S3Handler{Handler: h}
+	
+	// 라우터 생성
+	router := NewRouter()
+	
+	// 라우트 등록
+	RegisterAdminRoutes(router, adminHandler)
+	RegisterPublicRoutes(router, s3Handler)
+	
+	// 핸들러 함수 반환
+	handleFunc := func(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, *utils.AppError) {
+		return router.Handle(ctx, request, db)
+	}
+	
+	return router, handleFunc
 }
 

@@ -6,7 +6,6 @@ import (
 	"log"
 
 	config "lambda-go/pkg/configs"
-	handler "lambda-go/pkg/handlers"
 	repository "lambda-go/pkg/repositories"
 	"lambda-go/pkg/routes"
 	service "lambda-go/pkg/services"
@@ -72,15 +71,11 @@ func handleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 	s3Svc := service.NewPresignedURL(cfg, s3Client, presignClient)
 	adminSvc := service.NewAdmin(cfg, restaurantRepo)
 	
-	h := handler.NewHandler(cfg, s3Svc, adminSvc)
+	// 라우터 설정 및 요청 핸들러 함수 가져오기
+	_, handleFunc := routes.SetupRouter(ctx, cfg, s3Svc, adminSvc, sqlDB)
 	
-	router := routes.NewRouter()
-	
-	routes.RegisterAdminRoutes(router, h)
-	routes.RegisterPublicRoutes(router, h)
-	
-	// 라우터를 통한 요청 처리
-	response, appErr := router.Handle(ctx, request, sqlDB)
+	// 요청 처리
+	response, appErr := handleFunc(ctx, request)
 	if appErr != nil {
 		return appErrorToResponse(appErr), nil
 	}
