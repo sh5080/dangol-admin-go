@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"errors"
 	config "lambda-go/pkg/configs"
 	adminService "lambda-go/pkg/services/admin"
 	publicService "lambda-go/pkg/services/public"
 	"lambda-go/pkg/utils"
+	"net/http"
 
 	"github.com/aws/aws-lambda-go/events"
 )
@@ -65,6 +67,10 @@ func (h *Handler) errorResponse(statusCode int, message string) events.APIGatewa
 }
 
 // HandleAppError는 AppError를 적절한 API 응답으로 변환합니다.
-func (h *Handler) HandleAppError(appErr *utils.AppError) events.APIGatewayProxyResponse {
-	return h.errorResponse(appErr.StatusCode, appErr.Message)
+func (h *Handler) HandleAppError(err error) events.APIGatewayProxyResponse {
+	var appErr *utils.AppError
+	if errors.As(err, &appErr) {
+		return h.errorResponse(appErr.StatusCode, appErr.Message)
+	}
+	return h.errorResponse(http.StatusInternalServerError, "예상치 못한 오류가 발생했습니다")
 }
