@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"lambda-go/pkg/models"
+	dto "lambda-go/pkg/models/dtos"
 
 	"github.com/jackc/pgtype"
 	"github.com/jackc/pgx/v4"
@@ -26,25 +27,44 @@ func NewRestaurantRepository(dbPool *pgxpool.Pool) *RestaurantRepository {
 }
 
 // GetRestaurantRequests는 매장 생성 요청 목록을 조회합니다.
-func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context) ([]models.RestaurantRequest, int, error) {
+func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context, query dto.RestaurantRequestQuery) ([]models.RestaurantRequest, int, error) {
+	// 쿼리 빌더 패턴 적용
+	whereClause := `WHERE "deletedAt" IS NULL`
+	params := []interface{}{}
+	paramIndex := 1
+
+	// 상태 필터 적용
+	if query.Status != nil {
+		whereClause += fmt.Sprintf(` AND "status" = $%d`, paramIndex)
+		params = append(params, string(*query.Status))
+		paramIndex++
+	}
+
 	// 전체 개수 조회
 	var total int
-	countQuery := `SELECT COUNT(*) FROM "RestaurantRequest" WHERE "deletedAt" IS NULL`
-	err := r.dbPool.QueryRow(ctx, countQuery).Scan(&total)
+	countQuery := `SELECT COUNT(*) FROM "RestaurantRequest" ` + whereClause
+	err := r.dbPool.QueryRow(ctx, countQuery, params...).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("요청 개수 조회 오류: %w", err)
 	}
 
+	// 페이지네이션 적용
+	offset := (query.Page - 1) * query.PageSize
+	limit := query.PageSize
+
 	// 요청 목록 조회
-	query := `
+	queryStr := fmt.Sprintf(`
 		SELECT r."id", r."restaurantId", r."userId", r."rejectReason", 
 			r."createdAt", r."updatedAt", r."deletedAt", r."status"
 		FROM "RestaurantRequest" r
-		WHERE r."deletedAt" IS NULL
+		%s
 		ORDER BY r."createdAt" DESC
-	`
+		LIMIT $%d OFFSET $%d
+	`, whereClause, paramIndex, paramIndex+1)
 
-	rows, err := r.dbPool.Query(ctx, query)
+	params = append(params, limit, offset)
+
+	rows, err := r.dbPool.Query(ctx, queryStr, params...)
 	if err != nil {
 		return nil, 0, fmt.Errorf("요청 목록 조회 오류: %w", err)
 	}

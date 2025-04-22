@@ -6,6 +6,7 @@ import (
 
 	config "lambda-go/pkg/configs"
 	"lambda-go/pkg/models"
+	dto "lambda-go/pkg/models/dtos"
 	repository "lambda-go/pkg/repositories"
 	"lambda-go/pkg/utils"
 )
@@ -25,15 +26,20 @@ func NewRestaurantService(cfg *config.Config, restaurantRepo *repository.Restaur
 }
 
 // GetRestaurantRequests는 매장 생성 요청 목록을 조회합니다.
-func (s *RestaurantService) GetRestaurantRequests(ctx context.Context) (*models.RestaurantRequestsResponse, error) {
-	requests, total, err := s.restaurantRepo.GetRestaurantRequests(ctx)
+func (s *RestaurantService) GetRestaurantRequests(ctx context.Context, query dto.RestaurantRequestQuery) (*models.RestaurantRequestsResponse, error) {
+	requests, total, err := s.restaurantRepo.GetRestaurantRequests(ctx, query)
 	if err != nil {
 		return nil, utils.InternalServerError("매장 생성 요청 목록 조회 실패", err)
 	}
 
 	return &models.RestaurantRequestsResponse{
 		Requests: requests,
-		Total:    total,
+		Pagination: models.Pagination{
+			Total:      total,
+			Page:       query.Page,
+			PageSize:   query.PageSize,
+			TotalPages: (total + query.PageSize - 1) / query.PageSize,
+		},
 	}, nil
 }
 
