@@ -12,7 +12,6 @@ type PresignedURLRequest struct {
 
 // ProcessRestaurantRequest는 매장 생성 요청 처리 페이로드입니다.
 type ProcessRestaurantRequest struct {
-	Status       RequestStatus `json:"status" validate:"required,oneof=APPROVED REJECTED"`
-	RejectReason *string       `json:"rejectReason,omitempty" validate:"required_if=Status REJECTED,omitempty"`
-} 
- 
+	Status       RestaurantRequestStatus `json:"status" validate:"required,oneof=APPROVED REJECTED"`
+	RejectReason *string                 `json:"rejectReason,omitempty" validate:"required_if=Status REJECTED,omitempty"`
+}
