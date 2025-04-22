@@ -55,7 +55,8 @@ func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context, query 
 	// 요청 목록 조회
 	queryStr := fmt.Sprintf(`
 		SELECT r."id", r."restaurantId", r."userId", r."rejectReason", 
-			r."createdAt", r."updatedAt", r."deletedAt", r."status"
+			r."createdAt", r."updatedAt", r."deletedAt", r."status", r."type",
+			r."businessLicenseImageUrl", r."businessLicenseNumber"
 		FROM "RestaurantRequest" r
 		%s
 		ORDER BY r."createdAt" DESC
@@ -79,7 +80,8 @@ func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context, query 
 
 		err := rows.Scan(
 			&req.ID, &req.RestaurantID, &req.UserID, &rejectReason,
-			&req.CreatedAt, &req.UpdatedAt, &deletedAt, &req.Status,
+			&req.CreatedAt, &req.UpdatedAt, &deletedAt, &req.Status, &req.Type,
+			&req.BusinessLicenseImageUrl, &req.BusinessLicenseNumber,
 		)
 		if err != nil {
 			return nil, 0, fmt.Errorf("행 스캔 오류: %w", err)
@@ -105,10 +107,10 @@ func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context, query 
 	return result, total, nil
 }
 
-// GetRestaurantRequestByID는 ID로 매장 생성 요청을 조회합니다.
-func (r *RestaurantRepository) GetRestaurantRequestByID(ctx context.Context, requestID string) (models.RequestStatus, error) {
+// GetRestaurantRequestByID는 ID로 매장 요청을 조회합니다.
+func (r *RestaurantRepository) GetRestaurantRequestByID(ctx context.Context, requestID string) (models.RestaurantRequestStatus, error) {
 	var status string
-	query := `SELECT "status" FROM "RestaurantRequest" WHERE "restaurantId" = $1 AND "deletedAt" IS NULL`
+	query := `SELECT "status" FROM "RestaurantRequest" WHERE "id" = $1 AND "deletedAt" IS NULL`
 
 	err := r.dbPool.QueryRow(ctx, query, requestID).Scan(&status)
 	if err != nil {
@@ -118,7 +120,7 @@ func (r *RestaurantRepository) GetRestaurantRequestByID(ctx context.Context, req
 		return "", fmt.Errorf("요청 조회 오류: %w", err)
 	}
 
-	return models.RequestStatus(status), nil
+	return models.RestaurantRequestStatus(status), nil
 }
 
 // ProcessRestaurantRequest는 매장 생성 요청을 처리합니다.
@@ -137,7 +139,7 @@ func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, req
 	updateRequestQuery := `
 		UPDATE "RestaurantRequest"
 		SET "status" = $1, "updatedAt" = $2, "rejectReason" = $3
-		WHERE "restaurantId" = $4 AND "deletedAt" IS NULL
+		WHERE "id" = $4 AND "deletedAt" IS NULL
 		RETURNING "id", "restaurantId", "userId", "rejectReason", "createdAt", "updatedAt", "deletedAt", "status"
 	`
 
@@ -188,7 +190,7 @@ func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, req
 		`
 
 		_, err = tx.Exec(ctx, updateRestaurantQuery,
-			models.Hidden, // HIDDEN 상태로 설정
+			models.HIDDEN, // HIDDEN 상태로 설정
 			now,
 			request.RestaurantID,
 		)
