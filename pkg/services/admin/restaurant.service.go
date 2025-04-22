@@ -10,27 +10,27 @@ import (
 	"lambda-go/pkg/utils"
 )
 
-// AdminService는 어드민 관련 서비스를 제공합니다.
-type Admin struct {
-	config             *config.Config
-	restaurantRepo     *repository.RestaurantRepository
+// RestaurantService는 매장 관련 서비스를 제공합니다.
+type RestaurantService struct {
+	config         *config.Config
+	restaurantRepo *repository.RestaurantRepository
 }
 
-// NewAdminService는 새 AdminService 인스턴스를 생성합니다.
-func NewAdmin(cfg *config.Config, restaurantRepo *repository.RestaurantRepository) *Admin {
-	return &Admin{
+// NewRestaurantService는 새 RestaurantService 인스턴스를 생성합니다.
+func NewRestaurantService(cfg *config.Config, restaurantRepo *repository.RestaurantRepository) *RestaurantService {
+	return &RestaurantService{
 		config:         cfg,
 		restaurantRepo: restaurantRepo,
 	}
 }
 
 // GetRestaurantRequests는 매장 생성 요청 목록을 조회합니다.
-func (s *Admin) GetRestaurantRequests(ctx context.Context) (*models.RestaurantRequestsResponse, error) {
+func (s *RestaurantService) GetRestaurantRequests(ctx context.Context) (*models.RestaurantRequestsResponse, error) {
 	requests, total, err := s.restaurantRepo.GetRestaurantRequests(ctx)
 	if err != nil {
 		return nil, utils.InternalServerError("매장 생성 요청 목록 조회 실패", err)
 	}
-	
+
 	return &models.RestaurantRequestsResponse{
 		Requests: requests,
 		Total:    total,
@@ -38,7 +38,7 @@ func (s *Admin) GetRestaurantRequests(ctx context.Context) (*models.RestaurantRe
 }
 
 // ProcessRestaurantRequest는 매장 생성 요청을 승인하거나 거절합니다.
-func (s *Admin) ProcessRestaurantRequest(ctx context.Context, requestID string, payload *models.ProcessRestaurantRequest) (*models.RestaurantRequest, error) {
+func (s *RestaurantService) ProcessRestaurantRequest(ctx context.Context, requestID string, payload *models.ProcessRestaurantRequest) (*models.RestaurantRequest, error) {
 	// 현재 상태 조회
 	currentStatus, err := s.restaurantRepo.GetRestaurantRequestByID(ctx, requestID)
 	if err != nil {
@@ -55,6 +55,6 @@ func (s *Admin) ProcessRestaurantRequest(ctx context.Context, requestID string, 
 	if err != nil {
 		return nil, utils.InternalServerError("매장 생성 요청 처리 실패", err)
 	}
-	
+
 	return result, nil
-} 
+}

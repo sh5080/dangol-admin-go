@@ -27,21 +27,14 @@ func NewRestaurantRepository(dbPool *pgxpool.Pool) *RestaurantRepository {
 
 // GetRestaurantRequests는 매장 생성 요청 목록을 조회합니다.
 func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context) ([]models.RestaurantRequest, int, error) {
-	// 트랜잭션 시작
-	tx, err := r.dbPool.Begin(ctx)
-	if err != nil {
-		return nil, 0, fmt.Errorf("트랜잭션 시작 오류: %w", err)
-	}
-	defer tx.Rollback(ctx)
-	
 	// 전체 개수 조회
 	var total int
 	countQuery := `SELECT COUNT(*) FROM "RestaurantRequest" WHERE "deletedAt" IS NULL`
-	err = tx.QueryRow(ctx, countQuery).Scan(&total)
+	err := r.dbPool.QueryRow(ctx, countQuery).Scan(&total)
 	if err != nil {
 		return nil, 0, fmt.Errorf("요청 개수 조회 오류: %w", err)
 	}
-	
+
 	// 요청 목록 조회
 	query := `
 		SELECT r."id", r."restaurantId", r."userId", r."rejectReason", 
@@ -50,20 +43,20 @@ func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context) ([]mod
 		WHERE r."deletedAt" IS NULL
 		ORDER BY r."createdAt" DESC
 	`
-	
-	rows, err := tx.Query(ctx, query)
+
+	rows, err := r.dbPool.Query(ctx, query)
 	if err != nil {
 		return nil, 0, fmt.Errorf("요청 목록 조회 오류: %w", err)
 	}
 	defer rows.Close()
-	
+
 	// 모델 변환
 	var result []models.RestaurantRequest
 	for rows.Next() {
 		var req models.RestaurantRequest
 		var rejectReason pgtype.Text
 		var deletedAt pgtype.Timestamp
-		
+
 		err := rows.Scan(
 			&req.ID, &req.RestaurantID, &req.UserID, &rejectReason,
 			&req.CreatedAt, &req.UpdatedAt, &deletedAt, &req.Status,
@@ -71,29 +64,24 @@ func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context) ([]mod
 		if err != nil {
 			return nil, 0, fmt.Errorf("행 스캔 오류: %w", err)
 		}
-		
+
 		if rejectReason.Status == pgtype.Present {
 			reason := rejectReason.String
 			req.RejectReason = &reason
 		}
-		
+
 		if deletedAt.Status == pgtype.Present {
 			deleteTime := deletedAt.Time
 			req.DeletedAt = &deleteTime
 		}
-		
+
 		result = append(result, req)
 	}
-	
+
 	if err := rows.Err(); err != nil {
 		return nil, 0, fmt.Errorf("행 반복 오류: %w", err)
 	}
-	
-	// 트랜잭션 커밋
-	if err := tx.Commit(ctx); err != nil {
-		return nil, 0, fmt.Errorf("트랜잭션 커밋 오류: %w", err)
-	}
-	
+
 	return result, total, nil
 }
 
@@ -101,7 +89,7 @@ func (r *RestaurantRepository) GetRestaurantRequests(ctx context.Context) ([]mod
 func (r *RestaurantRepository) GetRestaurantRequestByID(ctx context.Context, requestID string) (models.RequestStatus, error) {
 	var status string
 	query := `SELECT "status" FROM "RestaurantRequest" WHERE "restaurantId" = $1 AND "deletedAt" IS NULL`
-	
+
 	err := r.dbPool.QueryRow(ctx, query, requestID).Scan(&status)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -109,7 +97,7 @@ func (r *RestaurantRepository) GetRestaurantRequestByID(ctx context.Context, req
 		}
 		return "", fmt.Errorf("요청 조회 오류: %w", err)
 	}
-	
+
 	return models.RequestStatus(status), nil
 }
 
@@ -121,10 +109,10 @@ func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, req
 		return nil, fmt.Errorf("트랜잭션 시작 오류: %w", err)
 	}
 	defer tx.Rollback(ctx)
-	
+
 	// 현재 시간
 	now := time.Now()
-	
+
 	// 요청 상태 업데이트
 	updateRequestQuery := `
 		UPDATE "RestaurantRequest"
@@ -132,12 +120,12 @@ func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, req
 		WHERE "restaurantId" = $4 AND "deletedAt" IS NULL
 		RETURNING "id", "restaurantId", "userId", "rejectReason", "createdAt", "updatedAt", "deletedAt", "status"
 	`
-	
+
 	// 결과 저장 변수
 	var request models.RestaurantRequest
 	var rejectReasonSQL pgtype.Text
 	var deletedAtSQL pgtype.Timestamp
-	
+
 	// 값 설정
 	var rejectReasonVal pgtype.Text
 	if payload.RejectReason != nil {
@@ -146,30 +134,30 @@ func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, req
 	} else {
 		rejectReasonVal.Status = pgtype.Null
 	}
-	
+
 	// 업데이트 실행 및 결과 스캔
-	err = tx.QueryRow(ctx, updateRequestQuery, 
+	err = tx.QueryRow(ctx, updateRequestQuery,
 		payload.Status, now, rejectReasonVal, requestID,
 	).Scan(
 		&request.ID, &request.RestaurantID, &request.UserID, &rejectReasonSQL,
 		&request.CreatedAt, &request.UpdatedAt, &deletedAtSQL, &request.Status,
 	)
-	
+
 	if err != nil {
 		return nil, fmt.Errorf("요청 업데이트 오류: %w", err)
 	}
-	
+
 	// NULL 값 처리
 	if rejectReasonSQL.Status == pgtype.Present {
 		reason := rejectReasonSQL.String
 		request.RejectReason = &reason
 	}
-	
+
 	if deletedAtSQL.Status == pgtype.Present {
 		deleteTime := deletedAtSQL.Time
 		request.DeletedAt = &deleteTime
 	}
-	
+
 	// 승인된 경우에만 Restaurant 상태 업데이트
 	if payload.Status == models.APPROVED {
 		// Restaurant 상태를 HIDDEN으로 업데이트
@@ -178,23 +166,23 @@ func (r *RestaurantRepository) ProcessRestaurantRequest(ctx context.Context, req
 			SET "status" = $1, "updatedAt" = $2
 			WHERE "id" = $3
 		`
-		
-		_, err = tx.Exec(ctx, updateRestaurantQuery, 
+
+		_, err = tx.Exec(ctx, updateRestaurantQuery,
 			models.Hidden, // HIDDEN 상태로 설정
 			now,
 			request.RestaurantID,
 		)
-		
+
 		if err != nil {
 			return nil, fmt.Errorf("매장 상태 업데이트 오류: %w", err)
 		}
 	}
-	
+
 	// 트랜잭션 커밋
 	err = tx.Commit(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("트랜잭션 커밋 오류: %w", err)
 	}
-	
+
 	return &request, nil
 }

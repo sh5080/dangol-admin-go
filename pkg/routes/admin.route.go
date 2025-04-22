@@ -18,7 +18,7 @@ func RegisterAdminRoutes(router Router, h RestaurantHandler) {
 		Path:     "/admin/restaurant/request",
 		Method:   "GET",
 		Handler:  h.GetRestaurantRequests,
-		AuthType: SessionAuth,
+		AuthType: NoAuth,
 	})
 
 	// 매장 생성 요청 처리 API
@@ -29,5 +29,3 @@ func RegisterAdminRoutes(router Router, h RestaurantHandler) {
 		AuthType: SessionAuth,
 	})
 }
-
-

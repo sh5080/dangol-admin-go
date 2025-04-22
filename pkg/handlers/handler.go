@@ -2,7 +2,8 @@ package handler
 
 import (
 	config "lambda-go/pkg/configs"
-	service "lambda-go/pkg/services"
+	adminService "lambda-go/pkg/services/admin"
+	publicService "lambda-go/pkg/services/public"
 	"lambda-go/pkg/utils"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -11,12 +12,12 @@ import (
 // Handler는 Lambda 핸들러 구조체입니다.
 type Handler struct {
 	config       *config.Config
-	S3Service    *service.PresignedURL
-	AdminService *service.Admin
+	S3Service    *publicService.S3Service
+	AdminService *adminService.RestaurantService
 }
 
 // NewHandler는 새 Handler 인스턴스를 생성합니다.
-func NewHandler(cfg *config.Config, s3Svc *service.PresignedURL, adminSvc *service.Admin) *Handler {
+func NewHandler(cfg *config.Config, s3Svc *publicService.S3Service, adminSvc *adminService.RestaurantService) *Handler {
 	return &Handler{
 		config:       cfg,
 		S3Service:    s3Svc,
@@ -30,11 +31,11 @@ func (h *Handler) CorsResponse(response events.APIGatewayProxyResponse) events.A
 	if response.Headers == nil {
 		response.Headers = make(map[string]string)
 	}
-	
+
 	response.Headers["Access-Control-Allow-Origin"] = "*"
 	response.Headers["Access-Control-Allow-Headers"] = "Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token"
 	response.Headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-	
+
 	return response
 }
 
@@ -44,7 +45,7 @@ func (h *Handler) SuccessResponse(statusCode int, data interface{}) events.APIGa
 	if err != nil {
 		return h.errorResponse(500, "응답 생성 중 오류가 발생했습니다")
 	}
-	
+
 	return h.CorsResponse(response)
 }
 
@@ -59,7 +60,7 @@ func (h *Handler) errorResponse(statusCode int, message string) events.APIGatewa
 		}
 		return h.CorsResponse(defaultResponse)
 	}
-	
+
 	return h.CorsResponse(response)
 }
 
@@ -67,4 +68,3 @@ func (h *Handler) errorResponse(statusCode int, message string) events.APIGatewa
 func (h *Handler) HandleAppError(appErr *utils.AppError) events.APIGatewayProxyResponse {
 	return h.errorResponse(appErr.StatusCode, appErr.Message)
 }
-

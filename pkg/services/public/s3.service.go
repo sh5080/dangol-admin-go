@@ -13,16 +13,16 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-// PresignedURLService는 Presigned URL 생성과 관련된 서비스를 제공합니다.
-type PresignedURL struct {
+// S3Service는 S3 관련 서비스를 제공합니다.
+type S3Service struct {
 	config        *config.Config
 	s3Client      *s3.Client
 	presignClient *s3.PresignClient
 }
 
-// NewPresignedURLService는 새 PresignedURLService 인스턴스를 생성합니다.
-func NewPresignedURL(cfg *config.Config, s3Client *s3.Client, presignClient *s3.PresignClient) *PresignedURL {
-	return &PresignedURL{
+// NewS3Service는 새 S3Service 인스턴스를 생성합니다.
+func NewS3Service(cfg *config.Config, s3Client *s3.Client, presignClient *s3.PresignClient) *S3Service {
+	return &S3Service{
 		config:        cfg,
 		s3Client:      s3Client,
 		presignClient: presignClient,
@@ -30,7 +30,7 @@ func NewPresignedURL(cfg *config.Config, s3Client *s3.Client, presignClient *s3.
 }
 
 // ValidateAndPreprocessRequest는 요청을 검증하고 기본값을 설정합니다.
-func (s *PresignedURL) ValidateAndPreprocessRequest(req *models.PresignedURLRequest) error {
+func (s *S3Service) ValidateAndPreprocessRequest(req *models.PresignedURLRequest) error {
 	// 버킷 검증
 	if req.Bucket == "" {
 		req.Bucket = s.config.DefaultBucket
@@ -75,7 +75,7 @@ func (s *PresignedURL) ValidateAndPreprocessRequest(req *models.PresignedURLRequ
 }
 
 // GeneratePresignedURL은 주어진 요청에 대한 Presigned URL을 생성합니다.
-func (s *PresignedURL) GeneratePresignedURL(ctx context.Context, req *models.PresignedURLRequest) (*models.PresignedURLResponse, error) {
+func (s *S3Service) GeneratePresignedURL(ctx context.Context, req *models.PresignedURLRequest) (*models.PresignedURLResponse, error) {
 	var presignedURL string
 	expiresAt := time.Now().Add(time.Duration(req.Duration) * time.Second).Unix()
 
