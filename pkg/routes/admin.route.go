@@ -26,6 +26,6 @@ func RegisterAdminRoutes(router Router, h RestaurantHandler) {
 		Path:     "/admin/restaurant/request/{id}/process",
 		Method:   "POST",
 		Handler:  h.ProcessRestaurantRequest,
-		AuthType: SessionAuth,
+		AuthType: NoAuth,
 	})
 }
